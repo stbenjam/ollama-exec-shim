@@ -1,5 +1,8 @@
 # Ollama Exec Shim
 
+> [!WARNING]
+> **This is probably a really stupid thing to do.** This tool is essentially **"Backdoor-as-a-Service"** by design. It turns unauthenticated (by default) web requests into shell commands on your machine. **Do not ever expose this to the public internet.** Use at your own risk, preferably behind a very sturdy firewall, on a machine you don't care about, while wearing a tinfoil hat.
+
 A lightweight FastAPI-based shim that mimics the Ollama API but executes local scripts instead of LLMs. This allows any tool that supports Ollama (like OpenClaw, the Ollama CLI, or other UI wrappers) to be used as a task scheduler or script runner.
 
 ## Features
@@ -67,10 +70,6 @@ To use `ollama-exec-shim` as a task scheduler in OpenClaw:
         ```text
         EXEC[/home/user/scripts/daily_report.py]
         ```
-
-## Security Note
-
-This tool is designed to execute local scripts. **Do not expose it to the public internet.** It should only be used on `localhost` or in a secured, private network environment. Even with token authentication and allowlists enabled, it provides significant system access by design.
 
 ## License
 
