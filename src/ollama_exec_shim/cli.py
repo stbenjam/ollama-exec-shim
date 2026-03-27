@@ -12,6 +12,22 @@ from datetime import datetime, timezone
 
 app = FastAPI(title="Ollama Exec Shim")
 
+# Get allowlist from environment
+ALLOWLIST = os.environ.get("OLLAMA_EXEC_ALLOWLIST")
+
+def is_allowed(script_path: str) -> bool:
+    if not ALLOWLIST:
+        return True
+    
+    allowed_dirs = ALLOWLIST.split(":")
+    abs_script_path = os.path.realpath(script_path)
+    
+    for allowed_dir in allowed_dirs:
+        abs_allowed_dir = os.path.realpath(allowed_dir)
+        if abs_script_path.startswith(abs_allowed_dir):
+            return True
+    return False
+
 # Get token from environment
 EXEC_TOKEN = os.environ.get("OLLAMA_EXEC_TOKEN")
 
@@ -235,6 +251,25 @@ async def chat(request: ChatRequest):
 
     if not os.access(script_path, os.X_OK):
         error_msg = f"Error: File is not executable: {script_path}"
+        if request.stream:
+            return StreamingResponse(
+                (json.dumps({
+                    "model": "exec",
+                    "created_at": get_timestamp(),
+                    "message": {"role": "assistant", "content": error_msg},
+                    "done": True
+                }) + "\n" for _ in range(1)),
+                media_type="application/x-ndjson"
+            )
+        return ChatResponse(
+            model="exec",
+            created_at=get_timestamp(),
+            message=Message(role="assistant", content=error_msg),
+            done=True
+        )
+
+    if not is_allowed(script_path):
+        error_msg = f"Error: Path not in allowlist: {script_path}"
         if request.stream:
             return StreamingResponse(
                 (json.dumps({

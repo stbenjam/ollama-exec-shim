@@ -10,6 +10,7 @@ A lightweight FastAPI-based shim that mimics the Ollama API but executes local s
 - **CLI Ready:** Works seamlessly with the official `ollama` CLI.
 - **Robust Path Extraction:** Supports extracting paths wrapped in `EXEC[/path/to/script]`.
 - **Optional Authentication:** Support for Bearer token authentication.
+- **Directory Allowlist:** Restrict execution to specific approved directories.
 
 ## Installation
 
@@ -32,16 +33,20 @@ By default, the shim listens on `http://localhost:11434` (the default Ollama por
 ollama-exec-shim
 ```
 
-### 2. Authentication (Optional)
+### 2. Security Configuration (Optional)
 
+#### API Token
 To protect the shim with an API token, set the `OLLAMA_EXEC_TOKEN` environment variable:
-
 ```bash
 export OLLAMA_EXEC_TOKEN="your-secure-token"
-ollama-exec-shim
 ```
 
-When set, all requests must include the matching `Authorization: Bearer your-secure-token` header.
+#### Directory Allowlist
+To restrict execution to specific directories, set the `OLLAMA_EXEC_ALLOWLIST` environment variable (colon-separated):
+```bash
+export OLLAMA_EXEC_ALLOWLIST="/home/user/scripts:/opt/tools/bin"
+```
+The shim uses `os.path.realpath` to resolve all paths, preventing bypasses via symbolic links or relative path traversals.
 
 ### 3. Run a Script via Ollama CLI
 Once the shim is running, you can use the official `ollama` command to execute any script:
@@ -49,8 +54,6 @@ Once the shim is running, you can use the official `ollama` command to execute a
 ```bash
 ollama run exec "/path/to/your/script.sh"
 ```
-
-**Note:** If authentication is enabled, ensure your Ollama client is configured to send the appropriate Bearer token.
 
 ### 4. Usage with OpenClaw
 
@@ -64,11 +67,10 @@ To use `ollama-exec-shim` as a task scheduler in OpenClaw:
         ```text
         EXEC[/home/user/scripts/daily_report.py]
         ```
-    *   The shim will extract the path between the brackets, execute it, and return the output as the assistant's response.
 
 ## Security Note
 
-This tool is designed to execute local scripts. **Do not expose it to the public internet.** It should only be used on `localhost` or in a secured, private network environment. It only executes files that already exist and have the executable bit set.
+This tool is designed to execute local scripts. **Do not expose it to the public internet.** It should only be used on `localhost` or in a secured, private network environment. Even with token authentication and allowlists enabled, it provides significant system access by design.
 
 ## License
 
