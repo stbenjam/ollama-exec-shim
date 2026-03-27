@@ -8,6 +8,7 @@ A lightweight FastAPI-based shim that mimics the Ollama API but executes local s
 - **Streaming Support:** Real-time stdout/stderr streaming in the standard Ollama NDJSON format.
 - **Model "exec":** Specifically handles the `exec` model to run any executable file.
 - **CLI Ready:** Works seamlessly with the official `ollama` CLI.
+- **Robust Path Extraction:** Supports extracting paths wrapped in `EXEC[/path/to/script]`.
 
 ## Installation
 
@@ -37,8 +38,19 @@ Once the shim is running, you can use the official `ollama` command to execute a
 ollama run exec "/path/to/your/script.sh"
 ```
 
-### 3. Use with OpenClaw or other tools
-Simply point your tool's Ollama provider to `http://localhost:11434`. The `exec` model will be available for selection.
+### 3. Usage with OpenClaw
+
+To use `ollama-exec-shim` as a task scheduler in OpenClaw:
+
+1.  **Provider Setup:** Add a new Ollama provider pointing to `http://localhost:11434`.
+2.  **Model Selection:** Select the `exec` model for your task or cron job.
+3.  **Job Configuration:**
+    *   **Context:** You **must** select **"Light context"** (or minimal context) to ensure the message sent to the shim is clean and focused.
+    *   **Command Syntax:** Use the `EXEC[...]` syntax in your prompt to clearly define the script to run, especially if there is other surrounding text:
+        ```text
+        EXEC[/home/user/scripts/daily_report.py]
+        ```
+    *   The shim will extract the path between the brackets, execute it, and return the output as the assistant's response.
 
 ## Security Note
 
