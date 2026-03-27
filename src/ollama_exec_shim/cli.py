@@ -12,19 +12,17 @@ from datetime import datetime, timezone
 
 app = FastAPI(title="Ollama Exec Shim")
 
-# Get allowlist from environment
-ALLOWLIST = os.environ.get("OLLAMA_EXEC_ALLOWLIST")
-
 def is_allowed(script_path: str) -> bool:
-    if not ALLOWLIST:
+    allowlist = os.environ.get("OLLAMA_EXEC_ALLOWLIST")
+    if not allowlist:
         return True
-    
-    allowed_dirs = ALLOWLIST.split(":")
+
+    allowed_dirs = allowlist.split(":")
     abs_script_path = os.path.realpath(script_path)
-    
+
     for allowed_dir in allowed_dirs:
         abs_allowed_dir = os.path.realpath(allowed_dir)
-        if abs_script_path.startswith(abs_allowed_dir):
+        if abs_script_path.startswith(abs_allowed_dir + os.sep) or abs_script_path == abs_allowed_dir:
             return True
     return False
 
@@ -188,6 +186,10 @@ async def generate(request: dict):
         error_msg = f"Error: File is not executable: {script_path}"
         return {"model": "exec", "created_at": get_timestamp(), "response": error_msg, "done": True}
 
+    if not is_allowed(script_path):
+        error_msg = f"Error: Path not in allowlist: {script_path}"
+        return {"model": "exec", "created_at": get_timestamp(), "response": error_msg, "done": True}
+
     if stream:
         async def generate_stream():
             process = await asyncio.create_subprocess_exec(
@@ -315,13 +317,6 @@ async def chat(request: ChatRequest):
             message=Message(role="assistant", content=f"Error executing script: {str(e)}"),
             done=True
         )
-
-def main():
-    import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=11434)
-
-if __name__ == "__main__":
-    main()
 
 def main():
     import uvicorn
