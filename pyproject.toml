@@ -1,0 +1,25 @@
+[build-system]
+requires = ["setuptools>=61.0"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "ollama-exec-shim"
+version = "0.1.0"
+description = "A shim that mimics the Ollama API to execute local scripts"
+readme = "README.md"
+requires-python = ">=3.9"
+license = {text = "MIT"}
+authors = [
+    {name = "Stephen Benjamin", email = "stephen@redhat.com"}
+]
+dependencies = [
+    "fastapi",
+    "uvicorn",
+    "pydantic"
+]
+
+[project.scripts]
+ollama-exec-shim = "ollama_exec_shim.cli:main"
+
+[tool.setuptools.packages.find]
+where = ["src"]

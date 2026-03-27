@@ -250,6 +250,9 @@ async def chat(request: ChatRequest):
             done=True
         )
 
-if __name__ == "__main__":
+def main():
     import uvicorn
     uvicorn.run(app, host="127.0.0.1", port=11434)
+
+if __name__ == "__main__":
+    main()
