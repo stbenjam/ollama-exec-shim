@@ -1,7 +1,9 @@
 # Ollama Exec Shim
 
 > [!WARNING]
-> **This is probably a really stupid thing to do.** This tool is essentially **"Backdoor-as-a-Service"** by design. It turns unauthenticated (by default) web requests into shell commands on your machine. **Do not ever expose this to the public internet.** Use at your own risk, preferably behind a very sturdy firewall, on a machine you don't care about, while wearing a tinfoil hat.
+> **This is probably a really stupid thing to do.** This tool is essentially **"Backdoor-as-a-Service"** by design. It turns unauthenticated (by default) web requests into shell commands on your machine. **Do not ever expose this to the public internet.** 
+> 
+> **You should only run this in a container** with carefully restricted bind-mounts and a directory allowlist. Use at your own risk, preferably behind a very sturdy firewall, on a machine you don't care about, while wearing a tinfoil hat.
 
 A lightweight FastAPI-based shim that mimics the Ollama API but executes local scripts instead of LLMs. This allows any tool that supports Ollama (like OpenClaw, the Ollama CLI, or other UI wrappers) to be used as a task scheduler or script runner.
 
