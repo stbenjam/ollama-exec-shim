@@ -46,7 +46,7 @@ You can run the shim in a container and bind-mount your scripts or workspaces. T
 The following command runs the shim, mounts the OpenClaw workspace, and restricts execution to that directory:
 
 ```bash
-docker run -d \
+podman run -d \
   --name ollama-exec-shim \
   -p 11434:11434 \
   -v /home/user/.openclaw/workspaces:/workspaces:ro \

@@ -11,8 +11,8 @@ WORKDIR /app
 # Copy project files
 COPY . .
 
-# Install the package
-RUN pip3 install --no-cache-dir .
+# Install the package and additional dependencies for scripts
+RUN pip3 install --no-cache-dir . requests
 
 # Expose the default Ollama port
 EXPOSE 11434
