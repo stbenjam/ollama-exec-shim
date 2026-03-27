@@ -36,7 +36,24 @@ By default, the shim listens on `http://localhost:11434` (the default Ollama por
 ollama-exec-shim
 ```
 
-### 2. Security Configuration (Optional)
+### 2. Running in a Container
+
+You can run the shim in a container and bind-mount your scripts or workspaces. This is especially useful for integration with tools like OpenClaw.
+
+#### Example: OpenClaw Workspace Integration
+The following command runs the shim, mounts the OpenClaw workspace, and restricts execution to that directory:
+
+```bash
+docker run -d \
+  --name ollama-exec-shim \
+  -p 11434:11434 \
+  -v /home/user/.openclaw/workspaces:/workspaces:ro \
+  -e OLLAMA_EXEC_ALLOWLIST="/workspaces" \
+  -e OLLAMA_EXEC_TOKEN="your-secure-token" \
+  ghcr.io/stbenjam/ollama-exec-shim:main
+```
+
+### 3. Security Configuration (Optional)
 
 #### API Token
 To protect the shim with an API token, set the `OLLAMA_EXEC_TOKEN` environment variable:
@@ -51,14 +68,14 @@ export OLLAMA_EXEC_ALLOWLIST="/home/user/scripts:/opt/tools/bin"
 ```
 The shim uses `os.path.realpath` to resolve all paths, preventing bypasses via symbolic links or relative path traversals.
 
-### 3. Run a Script via Ollama CLI
+### 4. Run a Script via Ollama CLI
 Once the shim is running, you can use the official `ollama` command to execute any script:
 
 ```bash
 ollama run exec "/path/to/your/script.sh"
 ```
 
-### 4. Usage with OpenClaw
+### 5. Usage with OpenClaw
 
 To use `ollama-exec-shim` as a task scheduler in OpenClaw:
 
@@ -68,7 +85,7 @@ To use `ollama-exec-shim` as a task scheduler in OpenClaw:
     *   **Context:** You **must** select **"Light context"** (or minimal context) to ensure the message sent to the shim is clean and focused.
     *   **Command Syntax:** Use the `EXEC[...]` syntax in your prompt to clearly define the script to run, especially if there is other surrounding text:
         ```text
-        EXEC[/home/user/scripts/daily_report.py]
+        EXEC[/workspaces/my-project/scripts/daily_report.py]
         ```
 
 ## License
