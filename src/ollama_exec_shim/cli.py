@@ -125,30 +125,41 @@ async def run_script_streaming(script_path: str) -> AsyncGenerator[str, None]:
             "done": True
         }) + "\n"
 
+import re
+
+def extract_command(text: str) -> str:
+    # Try to find EXEC[/path/to/script]
+    match = re.search(r'EXEC\[(.*?)\]', text)
+    if match:
+        return match.group(1).strip()
+    # Fallback to the original behavior
+    return text.strip()
+
 @app.post("/api/generate")
 async def generate(request: dict):
     model = request.get("model")
     if model != "exec":
         raise HTTPException(status_code=404, detail=f"Model '{model}' not found.")
 
-    prompt = request.get("prompt", "").strip()
+    prompt = request.get("prompt", "")
+    command = extract_command(prompt)
     stream = request.get("stream", False)
 
-    if not prompt:
-        raise HTTPException(status_code=400, detail="No prompt provided.")
+    if not command:
+        raise HTTPException(status_code=400, detail="No command provided.")
 
-    if not os.path.exists(prompt):
-        error_msg = f"Error: File not found: {prompt}"
+    if not os.path.exists(command):
+        error_msg = f"Error: File not found: {command}"
         return {"model": "exec", "created_at": get_timestamp(), "response": error_msg, "done": True}
 
-    if not os.access(prompt, os.X_OK):
-        error_msg = f"Error: File is not executable: {prompt}"
+    if not os.access(command, os.X_OK):
+        error_msg = f"Error: File is not executable: {command}"
         return {"model": "exec", "created_at": get_timestamp(), "response": error_msg, "done": True}
 
     if stream:
         async def generate_stream():
             process = await asyncio.create_subprocess_exec(
-                prompt,
+                command,
                 stdout=asyncio.subprocess.PIPE,
                 stderr=asyncio.subprocess.PIPE
             )
@@ -165,7 +176,7 @@ async def generate(request: dict):
         return StreamingResponse(generate_stream(), media_type="application/x-ndjson")
 
     try:
-        result = subprocess.run([prompt], capture_output=True, text=True, check=False)
+        result = subprocess.run([command], capture_output=True, text=True, check=False)
         output = result.stdout
         if result.stderr:
             output += f"\n\nSTDERR:\n{result.stderr}"
@@ -181,10 +192,10 @@ async def chat(request: ChatRequest):
     if not request.messages:
         raise HTTPException(status_code=400, detail="No messages provided.")
 
-    script_path = request.messages[-1].content.strip()
+    command = extract_command(request.messages[-1].content)
 
-    if not os.path.exists(script_path):
-        error_msg = f"Error: File not found: {script_path}"
+    if not os.path.exists(command):
+        error_msg = f"Error: File not found: {command}"
         if request.stream:
             return StreamingResponse(
                 (json.dumps({
@@ -202,8 +213,8 @@ async def chat(request: ChatRequest):
             done=True
         )
 
-    if not os.access(script_path, os.X_OK):
-        error_msg = f"Error: File is not executable: {script_path}"
+    if not os.access(command, os.X_OK):
+        error_msg = f"Error: File is not executable: {command}"
         if request.stream:
             return StreamingResponse(
                 (json.dumps({
@@ -222,11 +233,11 @@ async def chat(request: ChatRequest):
         )
 
     if request.stream:
-        return StreamingResponse(run_script_streaming(script_path), media_type="application/x-ndjson")
+        return StreamingResponse(run_script_streaming(command), media_type="application/x-ndjson")
 
     try:
         result = subprocess.run(
-            [script_path],
+            [command],
             capture_output=True,
             text=True,
             check=False
