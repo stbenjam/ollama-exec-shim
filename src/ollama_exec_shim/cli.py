@@ -78,10 +78,10 @@ async def pull(request: dict):
         yield json.dumps({"status": "success", "done": True}) + "\n"
     return StreamingResponse(pull_stream(), media_type="application/x-ndjson")
 
-async def run_script_streaming(script_path: str) -> AsyncGenerator[str, None]:
+async def run_script_streaming(args: List[str]) -> AsyncGenerator[str, None]:
     try:
         process = await asyncio.create_subprocess_exec(
-            script_path,
+            *args,
             stdout=asyncio.subprocess.PIPE,
             stderr=asyncio.subprocess.PIPE
         )
