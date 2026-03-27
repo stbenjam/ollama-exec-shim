@@ -2,16 +2,32 @@ import os
 import subprocess
 import json
 import asyncio
+import re
+import shlex
 from typing import List, Optional, AsyncGenerator
-from fastapi import FastAPI, HTTPException
+from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import StreamingResponse
 from pydantic import BaseModel
 from datetime import datetime, timezone
 
 app = FastAPI(title="Ollama Exec Shim")
 
-@app.get("/")
-@app.head("/")
+# Get token from environment
+EXEC_TOKEN = os.environ.get("OLLAMA_EXEC_TOKEN")
+
+async def verify_token(authorization: Optional[str] = Header(None)):
+    if not EXEC_TOKEN:
+        return
+    
+    if not authorization or not authorization.startswith("Bearer "):
+        raise HTTPException(status_code=401, detail="Missing or invalid Authorization header")
+    
+    token = authorization.split(" ")[1]
+    if token != EXEC_TOKEN:
+        raise HTTPException(status_code=401, detail="Unauthorized")
+
+@app.get("/", dependencies=[Depends(verify_token)])
+@app.head("/", dependencies=[Depends(verify_token)])
 async def root():
     return {"status": "ok"}
 
@@ -42,7 +58,7 @@ class TagsResponse(BaseModel):
 def get_timestamp():
     return datetime.now(timezone.utc).isoformat().replace("+00:00", "Z")
 
-@app.get("/api/tags")
+@app.get("/api/tags", dependencies=[Depends(verify_token)])
 async def get_tags():
     return TagsResponse(
         models=[
@@ -55,7 +71,7 @@ async def get_tags():
         ]
     )
 
-@app.post("/api/show")
+@app.post("/api/show", dependencies=[Depends(verify_token)])
 async def show(request: dict):
     return {
         "modelfile": "FROM exec",
@@ -70,7 +86,7 @@ async def show(request: dict):
         }
     }
 
-@app.post("/api/pull")
+@app.post("/api/pull", dependencies=[Depends(verify_token)])
 async def pull(request: dict):
     # Just yield success immediately
     async def pull_stream():
@@ -125,9 +141,6 @@ async def run_script_streaming(args: List[str]) -> AsyncGenerator[str, None]:
             "done": True
         }) + "\n"
 
-import re
-import shlex
-
 def extract_command(text: str) -> List[str]:
     # Try to find EXEC[/path/to/script --args]
     match = re.search(r'EXEC\[(.*?)\]', text)
@@ -136,7 +149,7 @@ def extract_command(text: str) -> List[str]:
     # Fallback to the original behavior (treating the whole message as a path)
     return shlex.split(text.strip())
 
-@app.post("/api/generate")
+@app.post("/api/generate", dependencies=[Depends(verify_token)])
 async def generate(request: dict):
     model = request.get("model")
     if model != "exec":
@@ -187,7 +200,7 @@ async def generate(request: dict):
     except Exception as e:
         return {"model": "exec", "created_at": get_timestamp(), "response": f"Error: {str(e)}", "done": True}
 
-@app.post("/api/chat")
+@app.post("/api/chat", dependencies=[Depends(verify_token)])
 async def chat(request: ChatRequest):
     if request.model != "exec":
         raise HTTPException(status_code=404, detail=f"Model '{request.model}' not found. Only 'exec' is supported.")
@@ -267,6 +280,13 @@ async def chat(request: ChatRequest):
             message=Message(role="assistant", content=f"Error executing script: {str(e)}"),
             done=True
         )
+
+def main():
+    import uvicorn
+    uvicorn.run(app, host="127.0.0.1", port=11434)
+
+if __name__ == "__main__":
+    main()
 
 def main():
     import uvicorn

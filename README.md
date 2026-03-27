@@ -9,6 +9,7 @@ A lightweight FastAPI-based shim that mimics the Ollama API but executes local s
 - **Model "exec":** Specifically handles the `exec` model to run any executable file.
 - **CLI Ready:** Works seamlessly with the official `ollama` CLI.
 - **Robust Path Extraction:** Supports extracting paths wrapped in `EXEC[/path/to/script]`.
+- **Optional Authentication:** Support for Bearer token authentication.
 
 ## Installation
 
@@ -31,14 +32,27 @@ By default, the shim listens on `http://localhost:11434` (the default Ollama por
 ollama-exec-shim
 ```
 
-### 2. Run a Script via Ollama CLI
+### 2. Authentication (Optional)
+
+To protect the shim with an API token, set the `OLLAMA_EXEC_TOKEN` environment variable:
+
+```bash
+export OLLAMA_EXEC_TOKEN="your-secure-token"
+ollama-exec-shim
+```
+
+When set, all requests must include the matching `Authorization: Bearer your-secure-token` header.
+
+### 3. Run a Script via Ollama CLI
 Once the shim is running, you can use the official `ollama` command to execute any script:
 
 ```bash
 ollama run exec "/path/to/your/script.sh"
 ```
 
-### 3. Usage with OpenClaw
+**Note:** If authentication is enabled, ensure your Ollama client is configured to send the appropriate Bearer token.
+
+### 4. Usage with OpenClaw
 
 To use `ollama-exec-shim` as a task scheduler in OpenClaw:
 
