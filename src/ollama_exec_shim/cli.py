@@ -320,7 +320,8 @@ async def chat(request: ChatRequest):
 
 def main():
     import uvicorn
-    uvicorn.run(app, host="127.0.0.1", port=11434)
+    host = os.environ.get("HOST", "127.0.0.1")
+    uvicorn.run(app, host=host, port=11434)
 
 if __name__ == "__main__":
     main()

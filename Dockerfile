@@ -18,6 +18,8 @@ RUN pip3 install --no-cache-dir . requests
 EXPOSE 11434
 
 # Set environment variables
+# Listen on all interfaces so the port is reachable outside the container
+ENV HOST="0.0.0.0"
 ENV OLLAMA_EXEC_TOKEN=""
 ENV OLLAMA_EXEC_ALLOWLIST=""
 
