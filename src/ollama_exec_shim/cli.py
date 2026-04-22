@@ -4,6 +4,8 @@ import json
 import asyncio
 import re
 import shlex
+import uuid
+import time
 from typing import List, Optional, AsyncGenerator
 from fastapi import FastAPI, HTTPException, Depends, Header
 from fastapi.responses import StreamingResponse
@@ -317,6 +319,135 @@ async def chat(request: ChatRequest):
             message=Message(role="assistant", content=f"Error executing script: {str(e)}"),
             done=True
         )
+
+@app.get("/v1/models", dependencies=[Depends(verify_token)])
+async def openai_models():
+    return {
+        "object": "list",
+        "data": [
+            {
+                "id": "exec",
+                "object": "model",
+                "created": int(time.time()),
+                "owned_by": "ollama-exec-shim",
+            }
+        ],
+    }
+
+
+def _openai_chunk(chat_id: str, content: str, finish_reason=None):
+    return {
+        "id": chat_id,
+        "object": "chat.completion.chunk",
+        "created": int(time.time()),
+        "model": "exec",
+        "choices": [
+            {
+                "index": 0,
+                "delta": {"content": content} if content else {},
+                "finish_reason": finish_reason,
+            }
+        ],
+    }
+
+
+@app.post("/v1/chat/completions", dependencies=[Depends(verify_token)])
+async def openai_chat_completions(request: dict):
+    model = request.get("model", "exec")
+    if model != "exec":
+        raise HTTPException(status_code=404, detail=f"Model '{model}' not found. Only 'exec' is supported.")
+
+    messages = request.get("messages", [])
+    if not messages:
+        raise HTTPException(status_code=400, detail="No messages provided.")
+
+    last_content = messages[-1].get("content", "")
+    args = extract_command(last_content)
+    if not args:
+        raise HTTPException(status_code=400, detail="No command provided.")
+
+    script_path = args[0]
+    stream = request.get("stream", False)
+    chat_id = f"chatcmpl-{uuid.uuid4().hex[:24]}"
+
+    if not os.path.exists(script_path):
+        error_msg = f"Error: File not found: {script_path}"
+        if stream:
+            async def err_stream():
+                yield f"data: {json.dumps(_openai_chunk(chat_id, error_msg))}\n\n"
+                yield f"data: {json.dumps(_openai_chunk(chat_id, '', finish_reason='stop'))}\n\n"
+                yield "data: [DONE]\n\n"
+            return StreamingResponse(err_stream(), media_type="text/event-stream")
+        return _openai_response(chat_id, error_msg)
+
+    if not os.access(script_path, os.X_OK):
+        error_msg = f"Error: File is not executable: {script_path}"
+        if stream:
+            async def err_stream():
+                yield f"data: {json.dumps(_openai_chunk(chat_id, error_msg))}\n\n"
+                yield f"data: {json.dumps(_openai_chunk(chat_id, '', finish_reason='stop'))}\n\n"
+                yield "data: [DONE]\n\n"
+            return StreamingResponse(err_stream(), media_type="text/event-stream")
+        return _openai_response(chat_id, error_msg)
+
+    if not is_allowed(script_path):
+        error_msg = f"Error: Path not in allowlist: {script_path}"
+        if stream:
+            async def err_stream():
+                yield f"data: {json.dumps(_openai_chunk(chat_id, error_msg))}\n\n"
+                yield f"data: {json.dumps(_openai_chunk(chat_id, '', finish_reason='stop'))}\n\n"
+                yield "data: [DONE]\n\n"
+            return StreamingResponse(err_stream(), media_type="text/event-stream")
+        return _openai_response(chat_id, error_msg)
+
+    if stream:
+        async def completions_stream():
+            process = await asyncio.create_subprocess_exec(
+                *args,
+                stdout=asyncio.subprocess.PIPE,
+                stderr=asyncio.subprocess.PIPE,
+            )
+            while True:
+                line = await process.stdout.readline()
+                if not line:
+                    break
+                yield f"data: {json.dumps(_openai_chunk(chat_id, line.decode()))}\n\n"
+            while True:
+                line = await process.stderr.readline()
+                if not line:
+                    break
+                yield f"data: {json.dumps(_openai_chunk(chat_id, f'STDERR: {line.decode()}'))}\n\n"
+            await process.wait()
+            yield f"data: {json.dumps(_openai_chunk(chat_id, '', finish_reason='stop'))}\n\n"
+            yield "data: [DONE]\n\n"
+        return StreamingResponse(completions_stream(), media_type="text/event-stream")
+
+    try:
+        result = subprocess.run(args, capture_output=True, text=True, check=False)
+        output = result.stdout
+        if result.stderr:
+            output += f"\n\nSTDERR:\n{result.stderr}"
+        return _openai_response(chat_id, output.strip() or "(no output)")
+    except Exception as e:
+        return _openai_response(chat_id, f"Error: {str(e)}")
+
+
+def _openai_response(chat_id: str, content: str):
+    return {
+        "id": chat_id,
+        "object": "chat.completion",
+        "created": int(time.time()),
+        "model": "exec",
+        "choices": [
+            {
+                "index": 0,
+                "message": {"role": "assistant", "content": content},
+                "finish_reason": "stop",
+            }
+        ],
+        "usage": {"prompt_tokens": 0, "completion_tokens": 0, "total_tokens": 0},
+    }
+
 
 def main():
     import uvicorn
