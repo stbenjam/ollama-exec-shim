@@ -362,6 +362,10 @@ async def openai_chat_completions(request: dict):
         raise HTTPException(status_code=400, detail="No messages provided.")
 
     last_content = messages[-1].get("content", "")
+    if isinstance(last_content, list):
+        last_content = " ".join(
+            part.get("text", "") for part in last_content if isinstance(part, dict)
+        )
     args = extract_command(last_content)
     if not args:
         raise HTTPException(status_code=400, detail="No command provided.")
